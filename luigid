@@ -1,0 +1,32 @@
+#!/bin/bash
+#PBS -P v10
+#PBS -q normal
+#PBS -l walltime=00:15:00,mem=4GB
+#PBS -l ncpus=32
+#PBS -j oe
+
+module load python/2.7.5
+module load gdal
+
+LOGDIR="${HOME}/luigid"
+rm -fr $LOGDIR
+
+# master node
+PYTHONPATH=~/luigi python luigi/bin/luigid --background --pidfile=$LOGDIR/luigi.pid --logdir=$LOGDIR --state-path=$LOGDIR
+hostname > $LOGDIR/headnode
+date > $LOGDIR/started
+
+# worker nodes
+pbsdsh -- bash -l -c '
+export PATH=$PBS_O_PATH
+export PYTHONPATH=~/luigi
+module load python/2.7.5
+module load gdal
+python big.py $(cat luigid/headnode)'
+
+date > $LOGDIR/finished
+
+# shutdown
+sleep 10
+kill $(cat luigid/luigi.pid)
+rm luigid/luigi.pid
